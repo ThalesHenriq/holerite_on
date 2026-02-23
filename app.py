@@ -1,5 +1,10 @@
 import streamlit as st
-from fpdf import FPDF
+try:
+    from fpdf import FPDF
+except ImportError:
+    st.error("Biblioteca 'fpdf' não instalada. Adicione 'fpdf' ao requirements.txt e redeploy.")
+    st.stop()
+
 import io
 
 # Função INSS 2026 (progressiva real)
@@ -81,11 +86,13 @@ with tab2:
         else:
             st.warning("Digite uma descrição.")
 
-    # Exibir itens adicionados
+    # Inicializa totais SEMPRE (corrigindo o NameError)
+    total_proventos_var = 0
+    total_descontos_var = 0
+
+    # Exibir e calcular itens adicionados (loop roda mesmo se vazio)
     if st.session_state.itens:
         st.subheader("Itens Adicionados")
-        total_proventos_var = 0
-        total_descontos_var = 0
         
         for i, item in enumerate(st.session_state.itens):
             col1, col2, col3 = st.columns([4, 2, 1])
@@ -96,13 +103,16 @@ with tab2:
                 del st.session_state.itens[i]
                 st.rerun()
 
-            if item["valor"] >= 0:
-                total_proventos_var += item["valor"]
-            else:
-                total_descontos_var += abs(item["valor"])
+    # Calcula totais no loop (agora fora do if, mas loop só roda se houver itens)
+    for item in st.session_state.itens:  # Loop sobre a lista diretamente
+        if item["valor"] >= 0:
+            total_proventos_var += item["valor"]
+        else:
+            total_descontos_var += abs(item["valor"])
 
-        st.markdown(f"*Total Proventos Variáveis:* R$ {total_proventos_var:.2f}")
-        st.markdown(f"*Total Descontos Variáveis:* R$ {total_descontos_var:.2f}")
+    if st.session_state.itens:
+        st.markdown(f"**Total Proventos Variáveis:** R$ {total_proventos_var:.2f}")
+        st.markdown(f"**Total Descontos Variáveis:** R$ {total_descontos_var:.2f}")
 
     # Cálculo final
     proventos = salario_base + total_proventos_var
@@ -115,12 +125,12 @@ with tab2:
 
     st.divider()
     st.subheader("Resumo Cálculo")
-    st.write(f"*Proventos Totais:* R$ {proventos:.2f}")
-    st.write(f"*INSS:* R$ {inss:.2f}")
-    st.write(f"*Base IRRF:* R$ {base_ir:.2f}")
-    st.write(f"*IRRF:* R$ {irrf:.2f}")
-    st.write(f"*Descontos Variáveis:* R$ {descontos_var:.2f}")
-    st.write(f"*Salário Líquido:* R$ {liquido:.2f}")
+    st.write(f"**Proventos Totais:** R$ {proventos:.2f}")
+    st.write(f"**INSS:** R$ {inss:.2f}")
+    st.write(f"**Base IRRF:** R$ {base_ir:.2f}")
+    st.write(f"**IRRF:** R$ {irrf:.2f}")
+    st.write(f"**Descontos Variáveis:** R$ {descontos_var:.2f}")
+    st.write(f"**Salário Líquido:** R$ {liquido:.2f}")
 
 # Botão Gerar PDF (usa os valores calculados)
 if st.button("Gerar Holerite em PDF"):
@@ -170,8 +180,8 @@ if st.button("Gerar Holerite em PDF"):
     pdf.ln(20)
 
     pdf.set_font("Arial", size=10)
-    pdf.cell(0, 10, "Assinatura do Funcionário: ___________ Data: _//_", ln=1)
-    pdf.cell(0, 10, "Assinatura do Responsável: ___________ Data: _//_", ln=1)
+    pdf.cell(0, 10, "Assinatura do Funcionário: _______________________________ Data: __/__/____", ln=1)
+    pdf.cell(0, 10, "Assinatura do Responsável: _______________________________ Data: __/__/____", ln=1)
 
     pdf_output = io.BytesIO(pdf.output(dest='S').encode('latin1'))
     pdf_output.seek(0)
@@ -179,6 +189,6 @@ if st.button("Gerar Holerite em PDF"):
     st.download_button(
         "Baixar Holerite PDF",
         pdf_output,
-        file_name=f"holerite_{nome_func.replace(' ', '')}{mes_ano.replace('/', '_')}.pdf",
+        file_name=f"holerite_{nome_func.replace(' ', '_')}_{mes_ano.replace('/', '_')}.pdf",
         mime="application/pdf"
     )
